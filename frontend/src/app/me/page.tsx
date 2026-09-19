@@ -1,7 +1,8 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { apiFetch, setAccessToken } from '@/lib/api';
 
 interface User {
@@ -9,7 +10,7 @@ interface User {
   email: string;
   firstName: string;
   lastName: string;
-  role: string;
+  role: 'STUDENT' | 'PARENT' | 'TEACHER' | 'ADMIN';
   status: string;
 }
 
@@ -43,25 +44,74 @@ export default function Me() {
     }
   };
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen">Chargement...</div>;
+  if (loading) return <div className="flex items-center justify-center min-h-screen text-gray-500">Chargement...</div>;
   if (!user) return null;
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-4">
-      <div className="p-8 bg-white shadow-md rounded w-96">
-        <h1 className="text-2xl font-bold mb-6 text-center">Mon Profil</h1>
-        <div className="space-y-4 mb-6">
-          <div><span className="font-semibold">Nom:</span> {user.firstName} {user.lastName}</div>
-          <div><span className="font-semibold">Email:</span> {user.email}</div>
-          <div><span className="font-semibold">Rôle:</span> {user.role}</div>
+    <div className="flex items-center justify-center min-h-screen p-4 bg-gray-50">
+      <div className="p-8 bg-white shadow-lg rounded-xl w-full max-w-md border border-gray-100">
+        <h1 className="text-2xl font-bold mb-6 text-center text-gray-900">Mon Profil & Espace</h1>
+        <div className="space-y-4 mb-6 bg-gray-50 p-4 rounded-lg">
+          <div><span className="font-semibold text-gray-700">Nom :</span> {user.firstName} {user.lastName}</div>
+          <div><span className="font-semibold text-gray-700">Email :</span> {user.email}</div>
+          <div><span className="font-semibold text-gray-700">Rôle :</span> <span className="font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-sm">{user.role}</span></div>
           <div>
-            <span className="font-semibold">Statut:</span> 
-            <span className={`ml-2 px-2 py-1 rounded text-sm ${user.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+            <span className="font-semibold text-gray-700">Statut :</span> 
+            <span className={`ml-2 px-2 py-0.5 rounded text-sm font-medium ${user.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
               {user.status}
             </span>
           </div>
         </div>
-        <button onClick={handleLogout} className="w-full bg-red-600 text-white p-2 rounded hover:bg-red-700">
+
+        {/* Shortcuts depending on role */}
+        <div className="mb-6 space-y-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-2">Accès rapide</h2>
+          {user.role === 'TEACHER' && (
+            <>
+              <Link href="/groups" className="block w-full text-center bg-blue-600 text-white p-2.5 rounded font-medium hover:bg-blue-700 transition">
+                ?? Gérer mes Groupes & Séances
+              </Link>
+              <Link href="/my-sessions" className="block w-full text-center bg-gray-100 text-gray-700 p-2 rounded text-sm hover:bg-gray-200 transition">
+                ?? Planning global
+              </Link>
+            </>
+          )}
+
+          {user.role === 'STUDENT' && (
+            <>
+              <Link href="/my-groups" className="block w-full text-center bg-blue-600 text-white p-2.5 rounded font-medium hover:bg-blue-700 transition">
+                ?? Mes Groupes de SVT
+              </Link>
+              <Link href="/my-sessions" className="block w-full text-center bg-emerald-600 text-white p-2.5 rounded font-medium hover:bg-emerald-700 transition">
+                ?? Mon Planning & Séances
+              </Link>
+            </>
+          )}
+
+          {user.role === 'PARENT' && (
+            <>
+              <Link href="/my-children" className="block w-full text-center bg-purple-600 text-white p-2.5 rounded font-medium hover:bg-purple-700 transition">
+                ????? Suivi de mes enfants
+              </Link>
+              <Link href="/my-sessions" className="block w-full text-center bg-blue-600 text-white p-2.5 rounded font-medium hover:bg-blue-700 transition">
+                ?? Planning des cours
+              </Link>
+            </>
+          )}
+
+          {user.role === 'ADMIN' && (
+            <>
+              <Link href="/groups" className="block w-full text-center bg-blue-600 text-white p-2.5 rounded font-medium hover:bg-blue-700 transition">
+                ?? Administration des Groupes
+              </Link>
+              <Link href="/my-sessions" className="block w-full text-center bg-gray-100 text-gray-700 p-2 rounded text-sm hover:bg-gray-200 transition">
+                ?? Planning global
+              </Link>
+            </>
+          )}
+        </div>
+
+        <button onClick={handleLogout} className="w-full bg-red-600 text-white p-2.5 rounded font-medium hover:bg-red-700 transition">
           Déconnexion
         </button>
       </div>

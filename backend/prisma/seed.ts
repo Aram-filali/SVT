@@ -1,10 +1,10 @@
-import { PrismaClient, Role, AccountStatus } from '@prisma/client';
+﻿import { PrismaClient, Role, AccountStatus, SessionMode, ClassSessionStatus, EnrollmentStatus, GroupStatus } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import * as argon2 from 'argon2';
 import 'dotenv/config';
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://svt_user:svt_password@localhost:5432/svt_platform';
+const connectionString = process.env.DATABASE_URL || 'postgresql://svt_user:svt_password@localhost:5433/svt_platform';
 const pool = new pg.Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
@@ -27,7 +27,7 @@ async function main() {
   });
 
   const teacherPwd = await hash('Teacher123!');
-  await prisma.user.upsert({
+  const teacherUser = await prisma.user.upsert({
     where: { email: 'teacher@svt.dev' },
     update: {},
     create: {
@@ -39,6 +39,7 @@ async function main() {
       status: AccountStatus.ACTIVE,
       teacher: { create: {} },
     },
+    include: { teacher: true },
   });
 
   const parentPwd = await hash('Parent123!');
@@ -54,7 +55,7 @@ async function main() {
       status: AccountStatus.ACTIVE,
       parent: { create: {} },
     },
-    include: { parent: true }
+    include: { parent: true },
   });
 
   const studentPwd = await hash('Student123!');
@@ -70,7 +71,7 @@ async function main() {
       status: AccountStatus.ACTIVE,
       student: { create: {} },
     },
-    include: { student: true }
+    include: { student: true },
   });
 
   if (parent.parent && student.student) {
@@ -89,6 +90,63 @@ async function main() {
     });
   }
 
+  // Create demo group if none exists
+  if (teacherUser.teacher) {
+    const existingGroup = await prisma.group.findFirst({
+      where: { teacherId: teacherUser.teacher.id, name: 'SVT Terminale Spécialité' },
+    });
+
+    let group = existingGroup;
+    if (!group) {
+      group = await prisma.group.create({
+        data: {
+          name: 'SVT Terminale Spécialité',
+          level: 'Terminale',
+          capacity: 12,
+          description: 'Préparation approfondie au Baccalauréat SVT',
+          teacherId: teacherUser.teacher.id,
+          status: GroupStatus.ACTIVE,
+        },
+      });
+    }
+
+    if (group && student.student) {
+      const existingEnrollment = await prisma.enrollment.findFirst({
+        where: { groupId: group.id, studentId: student.student.id },
+      });
+      if (!existingEnrollment) {
+        await prisma.enrollment.create({
+          data: {
+            groupId: group.id,
+            studentId: student.student.id,
+            status: EnrollmentStatus.ACTIVE,
+          },
+        });
+      }
+
+      const existingSession = await prisma.classSession.findFirst({
+        where: { groupId: group.id },
+      });
+      if (!existingSession) {
+        const tomorrow = new Date(Date.now() + 24 * 3600 * 1000);
+        tomorrow.setHours(10, 0, 0, 0);
+        const tomorrowEnd = new Date(tomorrow.getTime() + 2 * 3600 * 1000);
+
+        await prisma.classSession.create({
+          data: {
+            groupId: group.id,
+            startAt: tomorrow,
+            endAt: tomorrowEnd,
+            mode: SessionMode.PRESENTIEL,
+            location: 'Salle SVT 1',
+            status: ClassSessionStatus.SCHEDULED,
+            notes: 'Introduction à la génétique mendélienne',
+          },
+        });
+      }
+    }
+  }
+
   const pendingPwd = await hash('Pending123!');
   await prisma.user.upsert({
     where: { email: 'pending@svt.dev' },
@@ -104,37 +162,7 @@ async function main() {
     },
   });
 
-  const suspendedPwd = await hash('Suspended123!');
-  await prisma.user.upsert({
-    where: { email: 'suspended@svt.dev' },
-    update: {},
-    create: {
-      email: 'suspended@svt.dev',
-      firstName: 'Suspended',
-      lastName: 'User',
-      passwordHash: suspendedPwd,
-      role: Role.STUDENT,
-      status: AccountStatus.SUSPENDED,
-      student: { create: {} },
-    },
-  });
-
-  const archivedPwd = await hash('Archived123!');
-  await prisma.user.upsert({
-    where: { email: 'archived@svt.dev' },
-    update: {},
-    create: {
-      email: 'archived@svt.dev',
-      firstName: 'Archived',
-      lastName: 'User',
-      passwordHash: archivedPwd,
-      role: Role.STUDENT,
-      status: AccountStatus.ARCHIVED,
-      student: { create: {} },
-    },
-  });
-
-  console.log('Seed completed.');
+  console.log('Seed completed with demo group, enrollment and session.');
 }
 
 main()

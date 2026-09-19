@@ -20,6 +20,28 @@ enum AccountStatus {
   ARCHIVED
 }
 
+enum GroupStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  ENDED
+  CANCELLED
+}
+
+enum SessionMode {
+  PRESENTIEL
+  ONLINE
+}
+
+enum ClassSessionStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
 model User {
   id            String        @id @default(uuid())
   email         String        @unique
@@ -41,24 +63,25 @@ model User {
 }
 
 model Student {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  level     String?
-  section   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String           @id @default(uuid())
+  userId      String           @unique
+  level       String?
+  section     String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
-  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parents ParentStudent[]
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parents     ParentStudent[]
+  enrollments Enrollment[]
 
   @@map("students")
 }
 
 model Parent {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String          @id @default(uuid())
+  userId    String          @unique
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
 
   user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   children ParentStudent[]
@@ -67,13 +90,14 @@ model Parent {
 }
 
 model Teacher {
-  id        String   @id @default(uuid())
-  userId    String   @unique
+  id        String    @id @default(uuid())
+  userId    String    @unique
   bio       String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groups    Group[]
 
   @@map("teachers")
 }
@@ -105,4 +129,64 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+model Group {
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  level       String
+  capacity    Int
+  teacherId   String
+  status      GroupStatus @default(ACTIVE)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  teacher     Teacher        @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  enrollments Enrollment[]
+  sessions    ClassSession[]
+
+  @@index([teacherId])
+  @@index([status])
+  @@map("groups")
+}
+
+model Enrollment {
+  id        String           @id @default(uuid())
+  studentId String
+  groupId   String
+  status    EnrollmentStatus @default(ACTIVE)
+  startDate DateTime         @default(now())
+  endDate   DateTime?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  group   Group   @relation(fields: [groupId], references: [id], onDelete: Restrict)
+
+  @@index([studentId])
+  @@index([groupId])
+  @@index([status])
+  @@map("enrollments")
+}
+
+model ClassSession {
+  id         String             @id @default(uuid())
+  groupId    String
+  startAt    DateTime
+  endAt      DateTime
+  mode       SessionMode        @default(PRESENTIEL)
+  location   String?
+  meetingUrl String?
+  status     ClassSessionStatus @default(SCHEDULED)
+  notes      String?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Restrict)
+
+  @@index([groupId])
+  @@index([startAt])
+  @@index([status])
+  @@map("class_sessions")
 }
