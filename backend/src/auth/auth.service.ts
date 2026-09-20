@@ -29,6 +29,7 @@ export class AuthService {
         email,
         firstName: dto.firstName,
         lastName: dto.lastName,
+        phone: dto.phone || null,
         passwordHash,
         role: dto.role,
         status: AccountStatus.PENDING,
@@ -106,11 +107,15 @@ export class AuthService {
     }
 
     if (session.revokedAt) {
-      await this.prisma.session.updateMany({
-        where: { userId: session.userId },
-        data: { revokedAt: new Date() },
-      });
-      throw new UnauthorizedException('Compromised token detected');
+      const revokedAgoMs = Date.now() - new Date(session.revokedAt).getTime();
+      if (revokedAgoMs > 15000) {
+        await this.prisma.session.updateMany({
+          where: { userId: session.userId },
+          data: { revokedAt: new Date() },
+        });
+        throw new UnauthorizedException('Compromised token detected');
+      }
+      throw new UnauthorizedException('Token already refreshed');
     }
 
     if (new Date() > session.expiresAt) {

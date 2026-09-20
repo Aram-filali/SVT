@@ -1,5 +1,5 @@
-import { Controller, Get, Patch, Param } from '@nestjs/common';
-import { Roles } from '../common/decorators/roles.decorator.js';
+import { Controller, Get, Patch, Post, Body, Param } from '@nestjs/common';
+import { Roles, CurrentUser } from '../common/decorators/index.js';
 import { Role } from '../common/enums/role.enum.js';
 import { UsersService } from './users.service.js';
 
@@ -24,6 +24,19 @@ export class UsersController {
   @Roles(Role.ADMIN)
   rejectUser(@Param('id') id: string) {
     return this.usersService.rejectUser(id);
+  }
+
+  // Parent routes for children management
+  @Get('parents/my-children')
+  @Roles(Role.PARENT)
+  getParentChildren(@CurrentUser() user: any) {
+    return this.usersService.getParentChildren(user.id);
+  }
+
+  @Post('parents/link-child')
+  @Roles(Role.PARENT)
+  linkChild(@CurrentUser() user: any, @Body() body: { studentEmailOrPhone: string }) {
+    return this.usersService.linkChild(user.id, body.studentEmailOrPhone);
   }
 
   // RBAC test routes

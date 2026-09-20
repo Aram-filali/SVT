@@ -33,6 +33,11 @@ export class GroupsController {
     return this.groupsService.findAll(user, includeHistory === 'true');
   }
 
+  @Get('available')
+  findAvailable(@Query('level') level?: string) {
+    return this.groupsService.findAvailable(level);
+  }
+
   @Get(':id')
   findOne(@CurrentUser() user: any, @Param('id') id: string) {
     return this.groupsService.findOne(user, id);

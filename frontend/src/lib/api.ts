@@ -17,27 +17,39 @@ export interface ApiError {
   error?: string;
 }
 
+let refreshPromise: Promise<boolean> | null = null;
+
 export async function refreshAccessToken(): Promise<boolean> {
-  try {
-    const res = await fetch(`${API_URL}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include', // Sends HttpOnly refresh_token cookie
-    });
-    if (!res.ok) {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${API_URL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include', // Sends HttpOnly refresh_token cookie
+      });
+      if (!res.ok) {
+        setAccessToken(null);
+        return false;
+      }
+      const data = await res.json();
+      if (data && data.accessToken) {
+        setAccessToken(data.accessToken);
+        return true;
+      }
       setAccessToken(null);
       return false;
+    } catch {
+      setAccessToken(null);
+      return false;
+    } finally {
+      refreshPromise = null;
     }
-    const data = await res.json();
-    if (data && data.accessToken) {
-      setAccessToken(data.accessToken);
-      return true;
-    }
-    setAccessToken(null);
-    return false;
-  } catch {
-    setAccessToken(null);
-    return false;
-  }
+  })();
+
+  return refreshPromise;
 }
 
 export async function apiFetch<T = unknown>(

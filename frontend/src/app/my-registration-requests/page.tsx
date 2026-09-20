@@ -87,21 +87,22 @@ export default function MyRegistrationRequestsPage() {
       const reqs = await apiFetch<RegistrationRequestItem[]>('/registration-requests');
       setRequests(reqs);
 
-      const groups = await apiFetch<GroupOption[]>('/groups');
-      setAvailableGroups(groups.filter((g) => g.status === 'ACTIVE'));
+      const groups = await apiFetch<GroupOption[]>('/groups/available');
+      setAvailableGroups(groups);
 
       if (user.role === 'PARENT') {
-        const myKids = await apiFetch<any[]>('/groups');
-        const kidsMap = new Map<string, string>();
-        myKids.forEach((item) => {
-          if (item.child && item.studentId) {
-            kidsMap.set(item.studentId, `${item.child.firstName} ${item.child.lastName}`);
+        try {
+          const myKids = await apiFetch<Array<{ studentId: string; firstName: string; lastName: string; email: string }>>('/parents/my-children');
+          const list = myKids.map((k) => ({
+            id: k.studentId,
+            name: `${k.firstName} ${k.lastName} (${k.email})`,
+          }));
+          setChildrenList(list);
+          if (list.length > 0) {
+            setSelectedStudentId(list[0].id);
           }
-        });
-        const list = Array.from(kidsMap.entries()).map(([id, name]) => ({ id, name }));
-        setChildrenList(list);
-        if (list.length > 0) {
-          setSelectedStudentId(list[0].id);
+        } catch (err) {
+          console.error('Erreur chargement enfants', err);
         }
       }
     } catch (err: any) {
@@ -123,15 +124,29 @@ export default function MyRegistrationRequestsPage() {
     setSubmitting(true);
 
     try {
+      let targetStudentId = selectedStudentId;
+
+      if (currentUser?.role === 'PARENT') {
+        if (!selectedStudentId) {
+          throw new Error("Veuillez renseigner ou sélectionner l'enfant concerné");
+        }
+
+        if (childrenList.length === 0) {
+          // Auto-link child by email/phone
+          const linked = await apiFetch<{ studentId: string }>('/parents/link-child', {
+            method: 'POST',
+            body: JSON.stringify({ studentEmailOrPhone: selectedStudentId }),
+          });
+          targetStudentId = linked.studentId;
+        }
+      }
+
       const payload: any = {
         message: message || undefined,
       };
 
       if (currentUser?.role === 'PARENT') {
-        if (!selectedStudentId) {
-          throw new Error("Veuillez sélectionner l'enfant concerné");
-        }
-        payload.studentId = selectedStudentId;
+        payload.studentId = targetStudentId;
       }
 
       if (requestTargetType === 'GROUP') {
@@ -345,14 +360,19 @@ export default function MyRegistrationRequestsPage() {
                       ))}
                     </select>
                   ) : (
-                    <input
-                      type="text"
-                      required
-                      placeholder="Identifiant élève"
-                      value={selectedStudentId}
-                      onChange={(e) => setSelectedStudentId(e.target.value)}
-                      className="w-full p-2 border rounded outline-none"
-                    />
+                    <div>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Email ou téléphone de votre enfant"
+                        value={selectedStudentId}
+                        onChange={(e) => setSelectedStudentId(e.target.value)}
+                        className="w-full p-2 border rounded outline-none"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Indiquez l'email ou le téléphone de compte de votre enfant.
+                      </p>
+                    </div>
                   )}
                 </div>
               )}

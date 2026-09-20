@@ -59,9 +59,15 @@ export class RegistrationRequestsService {
         throw new BadRequestException("Veuillez spécifier l'identifiant de l'élève");
       }
 
+      const input = dto.studentId.trim();
       const targetStudent = await this.prisma.student.findFirst({
         where: {
-          OR: [{ id: dto.studentId }, { userId: dto.studentId }],
+          OR: [
+            { id: input },
+            { userId: input },
+            { user: { email: { equals: input, mode: 'insensitive' } } },
+            { user: { phone: input } },
+          ],
         },
       });
       if (!targetStudent) {

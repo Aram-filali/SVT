@@ -191,6 +191,43 @@ export class GroupsService {
     throw new ForbiddenException('Access denied');
   }
 
+  async findAvailable(level?: string) {
+    const where: any = { status: GroupStatus.ACTIVE };
+    if (level) {
+      where.level = level;
+    }
+    return this.prisma.group.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        level: true,
+        description: true,
+        capacity: true,
+        status: true,
+        teacher: {
+          select: {
+            id: true,
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            enrollments: { where: { status: EnrollmentStatus.ACTIVE } },
+            sessions: true,
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   async findOne(user: { id: string; role: Role }, id: string) {
     const group = await this.ownershipService.assertUserCanAccessGroup(user, id);
 

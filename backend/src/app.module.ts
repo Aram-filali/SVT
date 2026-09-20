@@ -21,8 +21,8 @@ import { RegistrationRequestsModule } from './registration-requests/registration
       inject: [ConfigService],
       useFactory: (config: ConfigService) => [
         {
-          ttl: config.get('NODE_ENV') === 'test' ? 1000 : 900000,
-          limit: config.get('NODE_ENV') === 'test' ? 10000 : 5,
+          ttl: config.get('NODE_ENV') === 'production' ? 60000 : 1000,
+          limit: config.get('NODE_ENV') === 'production' ? 120 : 1000,
         },
       ],
     }),
