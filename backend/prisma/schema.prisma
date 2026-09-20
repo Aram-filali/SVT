@@ -42,49 +42,60 @@ enum ClassSessionStatus {
   COMPLETED
 }
 
-model User {
-  id            String        @id @default(uuid())
-  email         String        @unique
-  passwordHash  String
-  firstName     String
-  lastName      String
-  role          Role
-  status        AccountStatus @default(PENDING)
-  phone         String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+enum RegistrationRequestStatus {
+  PENDING
+  NEED_INFO
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
 
-  student       Student?
-  parent        Parent?
-  teacher       Teacher?
-  sessions      Session[]
+model User {
+  id                String                @id @default(uuid())
+  email             String                @unique
+  passwordHash      String
+  firstName         String
+  lastName          String
+  role              Role
+  status            AccountStatus         @default(PENDING)
+  phone             String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  student           Student?
+  parent            Parent?
+  teacher           Teacher?
+  sessions          Session[]
+  processedRequests RegistrationRequest[] @relation("ProcessedByUser")
 
   @@map("users")
 }
 
 model Student {
-  id          String           @id @default(uuid())
-  userId      String           @unique
-  level       String?
-  section     String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id                   String                @id @default(uuid())
+  userId               String                @unique
+  level                String?
+  section              String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parents     ParentStudent[]
-  enrollments Enrollment[]
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parents              ParentStudent[]
+  enrollments          Enrollment[]
+  registrationRequests RegistrationRequest[]
 
   @@map("students")
 }
 
 model Parent {
-  id        String          @id @default(uuid())
-  userId    String          @unique
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  id                   String                @id @default(uuid())
+  userId               String                @unique
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 
-  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  children ParentStudent[]
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  children             ParentStudent[]
+  registrationRequests RegistrationRequest[]
 
   @@map("parents")
 }
@@ -132,19 +143,20 @@ model Session {
 }
 
 model Group {
-  id          String      @id @default(uuid())
-  name        String
-  description String?
-  level       String
-  capacity    Int
-  teacherId   String
-  status      GroupStatus @default(ACTIVE)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id                   String                @id @default(uuid())
+  name                 String
+  description          String?
+  level                String
+  capacity             Int
+  teacherId            String
+  status               GroupStatus           @default(ACTIVE)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 
-  teacher     Teacher        @relation(fields: [teacherId], references: [id], onDelete: Restrict)
-  enrollments Enrollment[]
-  sessions    ClassSession[]
+  teacher              Teacher               @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  enrollments          Enrollment[]
+  sessions             ClassSession[]
+  registrationRequests RegistrationRequest[]
 
   @@index([teacherId])
   @@index([status])
@@ -189,4 +201,31 @@ model ClassSession {
   @@index([startAt])
   @@index([status])
   @@map("class_sessions")
+}
+
+model RegistrationRequest {
+  id              String                    @id @default(uuid())
+  studentId       String
+  parentId        String?
+  groupId         String?
+  requestedLevel  String?
+  message         String?
+  status          RegistrationRequestStatus @default(PENDING)
+  teacherMessage  String?
+  responseMessage String?
+  processedById   String?
+  processedAt     DateTime?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  student         Student                   @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  parent          Parent?                   @relation(fields: [parentId], references: [id], onDelete: SetNull)
+  group           Group?                    @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  processedBy     User?                     @relation("ProcessedByUser", fields: [processedById], references: [id], onDelete: SetNull)
+
+  @@index([studentId])
+  @@index([parentId])
+  @@index([groupId])
+  @@index([status])
+  @@map("registration_requests")
 }

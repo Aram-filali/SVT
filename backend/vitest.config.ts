@@ -8,6 +8,7 @@ export default defineConfig({
     globals: true,
     root: './',
     testTimeout: 30000,
+    fileParallelism: false,
   },
   plugins: [
     swc.vite({ module: { type: 'es6' } }),

@@ -1,9 +1,10 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiFetch, setAccessToken } from '@/lib/api';
+import { useMounted } from '@/lib/useMounted';
 
 interface User {
   id: string;
@@ -15,6 +16,7 @@ interface User {
 }
 
 export default function Me() {
+  const mounted = useMounted();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -44,7 +46,7 @@ export default function Me() {
     }
   };
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen text-gray-500">Chargement...</div>;
+  if (!mounted || loading) return <div className="flex items-center justify-center min-h-screen text-gray-500">Chargement...</div>;
   if (!user) return null;
 
   return (
@@ -68,44 +70,56 @@ export default function Me() {
           <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-2">Accès rapide</h2>
           {user.role === 'TEACHER' && (
             <>
-              <Link href="/groups" className="block w-full text-center bg-blue-600 text-white p-2.5 rounded font-medium hover:bg-blue-700 transition">
-                ?? Gérer mes Groupes & Séances
+              <Link href="/registration-requests" className="block w-full text-center bg-amber-600 text-white p-2.5 rounded font-medium hover:bg-amber-700 transition">
+                Demandes d'inscription
               </Link>
-              <Link href="/my-sessions" className="block w-full text-center bg-gray-100 text-gray-700 p-2 rounded text-sm hover:bg-gray-200 transition">
-                ?? Planning global
+              <Link href="/groups" className="block w-full text-center bg-blue-600 text-white p-2.5 rounded font-medium hover:bg-blue-700 transition">
+                Gérer mes Groupes & Séances
+              </Link>
+              <Link href="/my-sessions" className="block w-full text-center bg-gray-100 text-gray-700 p-2 rounded text-sm hover:bg-gray-200 transition font-medium">
+                Planning global
               </Link>
             </>
           )}
 
           {user.role === 'STUDENT' && (
             <>
+              <Link href="/my-registration-requests" className="block w-full text-center bg-indigo-600 text-white p-2.5 rounded font-medium hover:bg-indigo-700 transition">
+                Mes Demandes d'Inscription
+              </Link>
               <Link href="/my-groups" className="block w-full text-center bg-blue-600 text-white p-2.5 rounded font-medium hover:bg-blue-700 transition">
-                ?? Mes Groupes de SVT
+                Mes Groupes de SVT
               </Link>
               <Link href="/my-sessions" className="block w-full text-center bg-emerald-600 text-white p-2.5 rounded font-medium hover:bg-emerald-700 transition">
-                ?? Mon Planning & Séances
+                Mon Planning & Séances
               </Link>
             </>
           )}
 
           {user.role === 'PARENT' && (
             <>
+              <Link href="/my-registration-requests" className="block w-full text-center bg-indigo-600 text-white p-2.5 rounded font-medium hover:bg-indigo-700 transition">
+                Mes Demandes d'Inscription
+              </Link>
               <Link href="/my-children" className="block w-full text-center bg-purple-600 text-white p-2.5 rounded font-medium hover:bg-purple-700 transition">
-                ????? Suivi de mes enfants
+                Suivi de mes enfants
               </Link>
               <Link href="/my-sessions" className="block w-full text-center bg-blue-600 text-white p-2.5 rounded font-medium hover:bg-blue-700 transition">
-                ?? Planning des cours
+                Planning des cours
               </Link>
             </>
           )}
 
           {user.role === 'ADMIN' && (
             <>
-              <Link href="/groups" className="block w-full text-center bg-blue-600 text-white p-2.5 rounded font-medium hover:bg-blue-700 transition">
-                ?? Administration des Groupes
+              <Link href="/registration-requests" className="block w-full text-center bg-amber-600 text-white p-2.5 rounded font-medium hover:bg-amber-700 transition">
+                Gestion des Demandes d'Inscription
               </Link>
-              <Link href="/my-sessions" className="block w-full text-center bg-gray-100 text-gray-700 p-2 rounded text-sm hover:bg-gray-200 transition">
-                ?? Planning global
+              <Link href="/groups" className="block w-full text-center bg-blue-600 text-white p-2.5 rounded font-medium hover:bg-blue-700 transition">
+                Administration des Groupes
+              </Link>
+              <Link href="/my-sessions" className="block w-full text-center bg-gray-100 text-gray-700 p-2 rounded text-sm hover:bg-gray-200 transition font-medium">
+                Planning global
               </Link>
             </>
           )}

@@ -1,4 +1,4 @@
-﻿import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
@@ -9,6 +9,7 @@ import { UsersModule } from './users/users.module.js';
 import { GroupsModule } from './groups/groups.module.js';
 import { EnrollmentsModule } from './enrollments/enrollments.module.js';
 import { ClassSessionsModule } from './class-sessions/class-sessions.module.js';
+import { RegistrationRequestsModule } from './registration-requests/registration-requests.module.js';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { ClassSessionsModule } from './class-sessions/class-sessions.module.js';
     GroupsModule,
     EnrollmentsModule,
     ClassSessionsModule,
+    RegistrationRequestsModule,
   ],
   providers: [
     {
