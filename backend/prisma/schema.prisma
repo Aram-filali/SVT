@@ -50,6 +50,27 @@ enum RegistrationRequestStatus {
   CANCELLED
 }
 
+enum ResourceType {
+  PDF
+  DOCUMENT
+  IMAGE
+  VIDEO
+  LINK
+  OTHER
+}
+
+enum ResourceStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
 model User {
   id                String                @id @default(uuid())
   email             String                @unique
@@ -67,6 +88,8 @@ model User {
   teacher           Teacher?
   sessions          Session[]
   processedRequests RegistrationRequest[] @relation("ProcessedByUser")
+  uploadedResources Resource[]            @relation("UploadedByUser")
+  markedAttendances Attendance[]          @relation("AttendanceMarkedBy")
 
   @@map("users")
 }
@@ -83,6 +106,7 @@ model Student {
   parents              ParentStudent[]
   enrollments          Enrollment[]
   registrationRequests RegistrationRequest[]
+  attendances          Attendance[]
 
   @@map("students")
 }
@@ -157,6 +181,7 @@ model Group {
   enrollments          Enrollment[]
   sessions             ClassSession[]
   registrationRequests RegistrationRequest[]
+  resources            Resource[]
 
   @@index([teacherId])
   @@index([status])
@@ -195,7 +220,9 @@ model ClassSession {
   createdAt  DateTime           @default(now())
   updatedAt  DateTime           @updatedAt
 
-  group Group @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  group       Group        @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  resources   Resource[]
+  attendances Attendance[]
 
   @@index([groupId])
   @@index([startAt])
@@ -228,4 +255,52 @@ model RegistrationRequest {
   @@index([groupId])
   @@index([status])
   @@map("registration_requests")
+}
+
+model Resource {
+  id           String         @id @default(uuid())
+  title        String
+  description  String?
+  type         ResourceType
+  storageKey   String?
+  externalUrl  String?
+  mimeType     String?
+  fileSize     Int?
+  groupId      String?
+  sessionId    String?
+  uploadedById String
+  status       ResourceStatus @default(ACTIVE)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  group        Group?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  session      ClassSession?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  uploadedBy   User           @relation("UploadedByUser", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@index([groupId])
+  @@index([sessionId])
+  @@index([uploadedById])
+  @@index([status])
+  @@map("resources")
+}
+
+model Attendance {
+  id         String           @id @default(uuid())
+  sessionId  String
+  studentId  String
+  status     AttendanceStatus
+  note       String?
+  markedById String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  session    ClassSession     @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  student    Student          @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  markedBy   User?            @relation("AttendanceMarkedBy", fields: [markedById], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, studentId])
+  @@index([sessionId])
+  @@index([studentId])
+  @@index([status])
+  @@map("attendances")
 }

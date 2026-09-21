@@ -128,4 +128,25 @@ export class ResourceOwnershipService {
     await this.assertUserCanAccessGroup(user, session.groupId);
     return session;
   }
+
+  async assertTeacherOwnsResource(user: { id: string; role: Role }, resource: { id: string; uploadedById: string; groupId: string | null }) {
+    if (user.role === Role.ADMIN) {
+      return resource;
+    }
+
+    if (user.role !== Role.TEACHER) {
+      throw new ForbiddenException('Only teachers or admins can modify resources');
+    }
+
+    if (resource.uploadedById === user.id) {
+      return resource;
+    }
+
+    if (resource.groupId) {
+      await this.assertTeacherOwnsGroup(user, resource.groupId);
+      return resource;
+    }
+
+    throw new ForbiddenException('You do not have permission to manage this resource');
+  }
 }

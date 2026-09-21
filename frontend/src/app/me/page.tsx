@@ -93,6 +93,9 @@ export default function Me() {
               <Link href="/my-sessions" className="block w-full text-center bg-emerald-600 text-white p-2.5 rounded font-medium hover:bg-emerald-700 transition">
                 Mon Planning & Séances
               </Link>
+              <Link href="/my-attendances" className="block w-full text-center bg-teal-600 text-white p-2.5 rounded font-medium hover:bg-teal-700 transition">
+                Historique de mes Présences
+              </Link>
             </>
           )}
 
@@ -103,6 +106,9 @@ export default function Me() {
               </Link>
               <Link href="/my-children" className="block w-full text-center bg-purple-600 text-white p-2.5 rounded font-medium hover:bg-purple-700 transition">
                 Suivi de mes enfants
+              </Link>
+              <Link href="/my-attendances" className="block w-full text-center bg-teal-600 text-white p-2.5 rounded font-medium hover:bg-teal-700 transition">
+                Suivi des Présences
               </Link>
               <Link href="/my-sessions" className="block w-full text-center bg-blue-600 text-white p-2.5 rounded font-medium hover:bg-blue-700 transition">
                 Planning des cours

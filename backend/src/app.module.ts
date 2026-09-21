@@ -10,6 +10,9 @@ import { GroupsModule } from './groups/groups.module.js';
 import { EnrollmentsModule } from './enrollments/enrollments.module.js';
 import { ClassSessionsModule } from './class-sessions/class-sessions.module.js';
 import { RegistrationRequestsModule } from './registration-requests/registration-requests.module.js';
+import { StorageModule } from './storage/storage.module.js';
+import { ResourcesModule } from './resources/resources.module.js';
+import { AttendancesModule } from './attendances/attendances.module.js';
 
 @Module({
   imports: [
@@ -34,6 +37,9 @@ import { RegistrationRequestsModule } from './registration-requests/registration
     EnrollmentsModule,
     ClassSessionsModule,
     RegistrationRequestsModule,
+    StorageModule,
+    ResourcesModule,
+    AttendancesModule,
   ],
   providers: [
     {
