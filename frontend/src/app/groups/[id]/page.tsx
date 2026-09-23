@@ -442,7 +442,13 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
           {group.description && <p className="text-gray-600 mt-1">{group.description}</p>}
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Link
+            href={`/evaluations?groupId=${groupId}`}
+            className="px-3 py-2 text-sm text-violet-700 border border-violet-200 rounded hover:bg-violet-50 transition font-medium"
+          >
+            📝 Évaluations du groupe
+          </Link>
           {group.status === 'ACTIVE' && (
             <button
               onClick={handleArchiveGroup}

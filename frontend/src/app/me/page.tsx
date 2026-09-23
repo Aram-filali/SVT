@@ -76,6 +76,9 @@ export default function Me() {
               <Link href="/groups" className="block w-full text-center bg-blue-600 text-white p-2.5 rounded font-medium hover:bg-blue-700 transition">
                 Gérer mes Groupes & Séances
               </Link>
+              <Link href="/evaluations" className="block w-full text-center bg-violet-600 text-white p-2.5 rounded font-medium hover:bg-violet-700 transition">
+                Évaluations & Notes
+              </Link>
               <Link href="/my-sessions" className="block w-full text-center bg-gray-100 text-gray-700 p-2 rounded text-sm hover:bg-gray-200 transition font-medium">
                 Planning global
               </Link>
@@ -89,6 +92,12 @@ export default function Me() {
               </Link>
               <Link href="/my-groups" className="block w-full text-center bg-blue-600 text-white p-2.5 rounded font-medium hover:bg-blue-700 transition">
                 Mes Groupes de SVT
+              </Link>
+              <Link href="/my-evaluations" className="block w-full text-center bg-violet-600 text-white p-2.5 rounded font-medium hover:bg-violet-700 transition">
+                Mes Évaluations & Notes
+              </Link>
+              <Link href="/my-progress" className="block w-full text-center bg-fuchsia-600 text-white p-2.5 rounded font-medium hover:bg-fuchsia-700 transition">
+                Ma Progression
               </Link>
               <Link href="/my-sessions" className="block w-full text-center bg-emerald-600 text-white p-2.5 rounded font-medium hover:bg-emerald-700 transition">
                 Mon Planning & Séances
