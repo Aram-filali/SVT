@@ -13,6 +13,7 @@ import { RegistrationRequestsModule } from './registration-requests/registration
 import { StorageModule } from './storage/storage.module.js';
 import { ResourcesModule } from './resources/resources.module.js';
 import { AttendancesModule } from './attendances/attendances.module.js';
+import { EvaluationsModule } from './evaluations/evaluations.module.js';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AttendancesModule } from './attendances/attendances.module.js';
       envFilePath: ['.env', '../.env', 'backend/.env'],
     }),
     ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => [
         {
@@ -40,6 +42,7 @@ import { AttendancesModule } from './attendances/attendances.module.js';
     StorageModule,
     ResourcesModule,
     AttendancesModule,
+    EvaluationsModule,
   ],
   providers: [
     {

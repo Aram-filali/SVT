@@ -51,7 +51,7 @@ export class AuthGuard implements CanActivate {
         throw new ForbiddenException(`Account is ${user.status.toLowerCase()}`);
       }
       
-      request['user'] = user;
+      (request as any).user = user;
     } catch (e) {
       if (e instanceof ForbiddenException || e instanceof UnauthorizedException && e.message === 'User not found') {
         throw e;

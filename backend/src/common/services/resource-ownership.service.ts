@@ -73,47 +73,47 @@ export class ResourceOwnershipService {
       return group;
     }
 
-    if (user.role === Role.TEACHER) {
-      const teacher = await this.getTeacherProfile(user.id);
-      if (group.teacherId !== teacher.id) {
-        throw new ForbiddenException('You do not have access to this group');
+    if (user.role !== Role.TEACHER) {
+      if (user.role === Role.STUDENT) {
+        const student = await this.getStudentProfile(user.id);
+        const enrollment = await this.prisma.enrollment.findFirst({
+          where: {
+            studentId: student.id,
+            groupId: group.id,
+          },
+        });
+        if (!enrollment) {
+          throw new ForbiddenException('You are not enrolled in this group');
+        }
+        return group;
       }
-      return group;
+
+      if (user.role === Role.PARENT) {
+        const parent = await this.getParentProfile(user.id);
+        const parentStudents = await this.prisma.parentStudent.findMany({
+          where: { parentId: parent.id },
+        });
+        const studentIds = parentStudents.map((ps) => ps.studentId);
+        const enrollment = await this.prisma.enrollment.findFirst({
+          where: {
+            groupId: group.id,
+            studentId: { in: studentIds },
+          },
+        });
+        if (!enrollment) {
+          throw new ForbiddenException('None of your linked children are enrolled in this group');
+        }
+        return group;
+      }
+
+      throw new ForbiddenException('Access denied');
     }
 
-    if (user.role === Role.STUDENT) {
-      const student = await this.getStudentProfile(user.id);
-      const enrollment = await this.prisma.enrollment.findFirst({
-        where: {
-          studentId: student.id,
-          groupId: group.id,
-        },
-      });
-      if (!enrollment) {
-        throw new ForbiddenException('You are not enrolled in this group');
-      }
-      return group;
+    const teacher = await this.getTeacherProfile(user.id);
+    if (group.teacherId !== teacher.id) {
+      throw new ForbiddenException('You do not have access to this group');
     }
-
-    if (user.role === Role.PARENT) {
-      const parent = await this.getParentProfile(user.id);
-      const parentStudents = await this.prisma.parentStudent.findMany({
-        where: { parentId: parent.id },
-      });
-      const studentIds = parentStudents.map((ps) => ps.studentId);
-      const enrollment = await this.prisma.enrollment.findFirst({
-        where: {
-          groupId: group.id,
-          studentId: { in: studentIds },
-        },
-      });
-      if (!enrollment) {
-        throw new ForbiddenException('None of your linked children are enrolled in this group');
-      }
-      return group;
-    }
-
-    throw new ForbiddenException('Access denied');
+    return group;
   }
 
   async assertUserCanAccessSession(user: { id: string; role: Role }, sessionId: string) {
@@ -148,5 +148,32 @@ export class ResourceOwnershipService {
     }
 
     throw new ForbiddenException('You do not have permission to manage this resource');
+  }
+
+  async assertParentLinkedToStudent(userId: string, studentId: string) {
+    const parent = await this.getParentProfile(userId);
+    const link = await this.prisma.parentStudent.findUnique({
+      where: {
+        parentId_studentId: {
+          parentId: parent.id,
+          studentId,
+        },
+      },
+      include: {
+        student: {
+          include: {
+            user: {
+              select: { id: true, firstName: true, lastName: true, email: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!link) {
+      throw new ForbiddenException('This student is not linked to your account');
+    }
+
+    return { parent, student: link.student };
   }
 }

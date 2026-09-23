@@ -11,7 +11,7 @@ import { ResourceOwnershipService } from '../common/services/resource-ownership.
 import { Role } from '../common/enums/role.enum.js';
 import { CreateResourceDto } from './dto/create-resource.dto.js';
 import { UpdateResourceDto } from './dto/update-resource.dto.js';
-import { ResourceType, ResourceStatus, GroupStatus, ClassSessionStatus } from '@prisma/client';
+import { ResourceType, ResourceStatus, GroupStatus, ClassSessionStatus, EnrollmentStatus, Prisma } from '@prisma/client';
 
 @Injectable()
 export class ResourcesService {
@@ -198,7 +198,7 @@ export class ResourcesService {
     user: { id: string; role: Role },
     groupId?: string,
     sessionId?: string,
-  ) {
+  ): Promise<Prisma.ResourceWhereInput> {
     if (user.role === Role.ADMIN) {
       return { groupId, sessionId };
     }
@@ -212,7 +212,7 @@ export class ResourcesService {
       const student = await this.ownership.getStudentProfile(user.id);
       return {
         group: {
-          enrollments: { some: { studentId: student.id, status: 'ACTIVE' } },
+          enrollments: { some: { studentId: student.id, status: EnrollmentStatus.ACTIVE } },
         },
         groupId,
         sessionId,
@@ -228,7 +228,7 @@ export class ResourcesService {
       const studentIds = children.map((c) => c.studentId);
       return {
         group: {
-          enrollments: { some: { studentId: { in: studentIds }, status: 'ACTIVE' } },
+          enrollments: { some: { studentId: { in: studentIds }, status: EnrollmentStatus.ACTIVE } },
         },
         groupId,
         sessionId,

@@ -71,25 +71,42 @@ enum AttendanceStatus {
   EXCUSED
 }
 
-model User {
-  id                String                @id @default(uuid())
-  email             String                @unique
-  passwordHash      String
-  firstName         String
-  lastName          String
-  role              Role
-  status            AccountStatus         @default(PENDING)
-  phone             String?
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
+enum EvaluationType {
+  TEST
+  EXAM
+  QUIZ
+  HOMEWORK
+  PRACTICAL
+  OTHER
+}
 
-  student           Student?
-  parent            Parent?
-  teacher           Teacher?
-  sessions          Session[]
-  processedRequests RegistrationRequest[] @relation("ProcessedByUser")
-  uploadedResources Resource[]            @relation("UploadedByUser")
-  markedAttendances Attendance[]          @relation("AttendanceMarkedBy")
+enum EvaluationStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model User {
+  id                 String                @id @default(uuid())
+  email              String                @unique
+  passwordHash       String
+  firstName          String
+  lastName           String
+  role               Role
+  status             AccountStatus         @default(PENDING)
+  phone              String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  student            Student?
+  parent             Parent?
+  teacher            Teacher?
+  sessions           Session[]
+  processedRequests  RegistrationRequest[] @relation("ProcessedByUser")
+  uploadedResources  Resource[]            @relation("UploadedByUser")
+  markedAttendances  Attendance[]          @relation("AttendanceMarkedBy")
+  createdEvaluations Evaluation[]          @relation("EvaluationCreatedBy")
+  gradedResults      EvaluationResult[]    @relation("EvaluationGradedBy")
 
   @@map("users")
 }
@@ -107,6 +124,7 @@ model Student {
   enrollments          Enrollment[]
   registrationRequests RegistrationRequest[]
   attendances          Attendance[]
+  evaluationResults    EvaluationResult[]
 
   @@map("students")
 }
@@ -182,6 +200,7 @@ model Group {
   sessions             ClassSession[]
   registrationRequests RegistrationRequest[]
   resources            Resource[]
+  evaluations          Evaluation[]
 
   @@index([teacherId])
   @@index([status])
@@ -208,21 +227,22 @@ model Enrollment {
 }
 
 model ClassSession {
-  id         String             @id @default(uuid())
-  groupId    String
-  startAt    DateTime
-  endAt      DateTime
-  mode       SessionMode        @default(PRESENTIEL)
-  location   String?
-  meetingUrl String?
-  status     ClassSessionStatus @default(SCHEDULED)
-  notes      String?
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
+  id          String             @id @default(uuid())
+  groupId     String
+  startAt     DateTime
+  endAt       DateTime
+  mode        SessionMode        @default(PRESENTIEL)
+  location    String?
+  meetingUrl  String?
+  status      ClassSessionStatus @default(SCHEDULED)
+  notes       String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
-  group       Group        @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  group       Group              @relation(fields: [groupId], references: [id], onDelete: Restrict)
   resources   Resource[]
   attendances Attendance[]
+  evaluations Evaluation[]
 
   @@index([groupId])
   @@index([startAt])
@@ -303,4 +323,53 @@ model Attendance {
   @@index([studentId])
   @@index([status])
   @@map("attendances")
+}
+
+model Evaluation {
+  id          String           @id @default(uuid())
+  title       String
+  description String?
+  type        EvaluationType
+  date        DateTime
+  maxScore    Decimal          @db.Decimal(5, 2)
+  coefficient Decimal?         @db.Decimal(5, 2)
+  groupId     String
+  sessionId   String?
+  status      EvaluationStatus @default(DRAFT)
+  createdById String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  group       Group            @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  session     ClassSession?    @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  createdBy   User             @relation("EvaluationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  results     EvaluationResult[]
+
+  @@index([groupId])
+  @@index([sessionId])
+  @@index([createdById])
+  @@index([status])
+  @@index([date])
+  @@map("evaluations")
+}
+
+model EvaluationResult {
+  id           String     @id @default(uuid())
+  evaluationId String
+  studentId    String
+  score        Decimal    @db.Decimal(5, 2)
+  comment      String?
+  gradedById   String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  evaluation   Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Restrict)
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  gradedBy     User?      @relation("EvaluationGradedBy", fields: [gradedById], references: [id], onDelete: SetNull)
+
+  @@unique([evaluationId, studentId])
+  @@index([evaluationId])
+  @@index([studentId])
+  @@index([gradedById])
+  @@map("evaluation_results")
 }

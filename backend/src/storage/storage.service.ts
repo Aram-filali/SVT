@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Minio from 'minio';
 import { randomUUID } from 'node:crypto';
@@ -10,14 +10,21 @@ export class StorageService implements OnModuleInit {
   private readonly client: Minio.Client;
   private readonly bucket: string;
 
-  constructor(private config: ConfigService) {
-    this.bucket = this.config.get<string>('MINIO_BUCKET_NAME', 'svt-resources');
+  constructor(@Optional() private config?: ConfigService) {
+    this.bucket = this.config?.get?.('MINIO_BUCKET_NAME', 'svt-resources') ?? 'svt-resources';
+    const endpoint = this.config?.get?.('MINIO_ENDPOINT', 'localhost') ?? 'localhost';
+    const portStr = this.config?.get?.('MINIO_PORT', '9000') ?? '9000';
+    const port = parseInt(portStr, 10) || 9000;
+    const useSSL = (this.config?.get?.('MINIO_USE_SSL', 'false') ?? 'false') === 'true';
+    const accessKey = this.config?.get?.('MINIO_ACCESS_KEY', '') ?? '';
+    const secretKey = this.config?.get?.('MINIO_SECRET_KEY', '') ?? '';
+
     this.client = new Minio.Client({
-      endPoint: this.config.get<string>('MINIO_ENDPOINT', 'localhost'),
-      port: parseInt(this.config.get<string>('MINIO_PORT', '9000'), 10),
-      useSSL: this.config.get<string>('MINIO_USE_SSL', 'false') === 'true',
-      accessKey: this.config.get<string>('MINIO_ACCESS_KEY', ''),
-      secretKey: this.config.get<string>('MINIO_SECRET_KEY', ''),
+      endPoint: endpoint,
+      port,
+      useSSL,
+      accessKey,
+      secretKey,
     });
   }
 
@@ -38,59 +45,63 @@ export class StorageService implements OnModuleInit {
 
   /**
    * Upload a file buffer to MinIO.
-   * Returns a unique storage key (object name).
+   * Returns the generated storageKey.
    */
   async uploadFile(
-    buffer: Buffer,
-    originalName: string,
+    fileBuffer: Buffer,
+    originalFilename: string,
     mimeType: string,
   ): Promise<string> {
-    const ext = path.extname(originalName);
+    const ext = path.extname(originalFilename);
     const storageKey = `${randomUUID()}${ext}`;
+
     try {
-      await this.client.putObject(this.bucket, storageKey, buffer, buffer.length, {
-        'Content-Type': mimeType,
-      });
+      await this.client.putObject(
+        this.bucket,
+        storageKey,
+        fileBuffer,
+        fileBuffer.length,
+        { 'Content-Type': mimeType },
+      );
       return storageKey;
     } catch (err) {
-      this.logger.error(`Failed to upload file: ${String(err)}`);
-      throw new InternalServerErrorException('File upload failed');
+      this.logger.error(`MinIO upload error: ${String(err)}`);
+      throw new InternalServerErrorException('Failed to upload file to storage');
     }
   }
 
   /**
-   * Get a readable stream for a stored object.
+   * Get a readable stream for a file from MinIO.
    */
-  async getFileStream(storageKey: string): Promise<NodeJS.ReadableStream> {
+  async getFileStream(storageKey: string) {
     try {
       return await this.client.getObject(this.bucket, storageKey);
     } catch (err) {
-      this.logger.error(`Failed to get file: ${String(err)}`);
-      throw new InternalServerErrorException('File retrieval failed');
+      this.logger.error(`MinIO getObject error for key "${storageKey}": ${String(err)}`);
+      throw new InternalServerErrorException('Failed to retrieve file from storage');
     }
   }
 
   /**
-   * Get the stat (size, content-type) of a stored object.
+   * Get file metadata/stat from MinIO.
    */
-  async getFileStat(storageKey: string): Promise<Minio.BucketItemStat> {
+  async getFileStat(storageKey: string) {
     try {
       return await this.client.statObject(this.bucket, storageKey);
     } catch (err) {
-      this.logger.error(`Failed to stat file: ${String(err)}`);
-      throw new InternalServerErrorException('File stat failed');
+      this.logger.error(`MinIO statObject error for key "${storageKey}": ${String(err)}`);
+      throw new InternalServerErrorException('Failed to retrieve file metadata from storage');
     }
   }
 
   /**
-   * Delete a stored object (internal use only, not exposed via API).
+   * Delete a file from MinIO (soft-delete does not call this, but available).
    */
   async deleteFile(storageKey: string): Promise<void> {
     try {
       await this.client.removeObject(this.bucket, storageKey);
     } catch (err) {
-      this.logger.error(`Failed to delete file: ${String(err)}`);
-      throw new InternalServerErrorException('File deletion failed');
+      this.logger.error(`MinIO removeObject error for key "${storageKey}": ${String(err)}`);
     }
   }
 }

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AccountStatus } from '../common/enums/account-status.enum.js';
+import { Role } from '../common/enums/role.enum.js';
 
 @Injectable()
 export class UsersService {
