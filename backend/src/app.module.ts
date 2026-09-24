@@ -14,6 +14,7 @@ import { StorageModule } from './storage/storage.module.js';
 import { ResourcesModule } from './resources/resources.module.js';
 import { AttendancesModule } from './attendances/attendances.module.js';
 import { EvaluationsModule } from './evaluations/evaluations.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { EvaluationsModule } from './evaluations/evaluations.module.js';
     ResourcesModule,
     AttendancesModule,
     EvaluationsModule,
+    NotificationsModule,
   ],
   providers: [
     {

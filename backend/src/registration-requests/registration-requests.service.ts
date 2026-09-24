@@ -19,13 +19,16 @@ import {
   RegistrationRequestStatus,
   GroupStatus,
   EnrollmentStatus,
+  NotificationType,
 } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 @Injectable()
 export class RegistrationRequestsService {
   constructor(
     private prisma: PrismaService,
     private ownership: ResourceOwnershipService,
+    private notifications: NotificationsService,
   ) {}
 
   async create(user: { id: string; role: Role }, dto: CreateRegistrationRequestDto) {
@@ -121,7 +124,7 @@ export class RegistrationRequestsService {
       throw new ConflictException('Une demande est déjà en cours pour cet élève');
     }
 
-    return this.prisma.registrationRequest.create({
+    const created = await this.prisma.registrationRequest.create({
       data: {
         studentId,
         parentId,
@@ -136,7 +139,14 @@ export class RegistrationRequestsService {
             user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
           },
         },
-        group: { select: { id: true, name: true, level: true } },
+        group: {
+          select: {
+            id: true,
+            name: true,
+            level: true,
+            teacher: { select: { userId: true } },
+          },
+        },
         parent: {
           include: {
             user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
@@ -144,6 +154,41 @@ export class RegistrationRequestsService {
         },
       },
     });
+
+    const studentName = `${created.student.user.firstName} ${created.student.user.lastName}`;
+    if (created.group?.teacher?.userId) {
+      await this.notifications.createNotification({
+        userId: created.group.teacher.userId,
+        type: NotificationType.REGISTRATION_REQUEST,
+        title: "Nouvelle demande d'inscription",
+        message: `Demande d'inscription reçue de ${studentName} pour le groupe ${created.group.name}`,
+        link: '/registration-requests',
+        resourceType: 'RegistrationRequest',
+        resourceId: created.id,
+        idempotencyKey: `reg_req:${created.id}:created:${created.group.teacher.userId}`,
+      });
+    } else {
+      const admins = await this.prisma.user.findMany({
+        where: { role: Role.ADMIN },
+        select: { id: true },
+      });
+      await Promise.all(
+        admins.map((admin) =>
+          this.notifications.createNotification({
+            userId: admin.id,
+            type: NotificationType.REGISTRATION_REQUEST,
+            title: "Nouvelle demande d'inscription",
+            message: `Nouvelle demande d'inscription reçue de ${studentName} (niveau ${created.requestedLevel ?? 'non spécifié'})`,
+            link: '/registration-requests',
+            resourceType: 'RegistrationRequest',
+            resourceId: created.id,
+            idempotencyKey: `reg_req:${created.id}:created:${admin.id}`,
+          }),
+        ),
+      );
+    }
+
+    return created;
   }
 
   async findAll(user: { id: string; role: Role }, status?: RegistrationRequestStatus) {
@@ -317,7 +362,7 @@ export class RegistrationRequestsService {
       throw new ConflictException("Impossible de demander des informations pour une demande qui n'est pas en attente");
     }
 
-    return this.prisma.registrationRequest.update({
+    const updated = await this.prisma.registrationRequest.update({
       where: { id },
       data: {
         status: RegistrationRequestStatus.NEED_INFO,
@@ -329,6 +374,27 @@ export class RegistrationRequestsService {
         parent: { include: { user: true } },
       },
     });
+
+    const targetUserIds = new Set<string>();
+    if (updated.student?.user?.id) targetUserIds.add(updated.student.user.id);
+    if (updated.parent?.user?.id) targetUserIds.add(updated.parent.user.id);
+
+    await Promise.all(
+      Array.from(targetUserIds).map((userId) =>
+        this.notifications.createNotification({
+          userId,
+          type: NotificationType.REGISTRATION_REQUEST,
+          title: "Informations complémentaires demandées",
+          message: `L'enseignant a demandé des précisions sur votre demande d'inscription : ${dto.teacherMessage}`,
+          link: '/my-registration-requests',
+          resourceType: 'RegistrationRequest',
+          resourceId: updated.id,
+          idempotencyKey: `reg_req:${updated.id}:need_info:${userId}`,
+        }),
+      ),
+    );
+
+    return updated;
   }
 
   async respondInfo(user: { id: string; role: Role }, id: string, dto: RespondInfoDto) {
@@ -342,7 +408,9 @@ export class RegistrationRequestsService {
       throw new ForbiddenException('Seul le demandeur peut répondre à cette demande');
     }
 
-    return this.prisma.registrationRequest.update({
+    const previousUpdatedAt = req.updatedAt.getTime();
+
+    const updated = await this.prisma.registrationRequest.update({
       where: { id },
       data: {
         status: RegistrationRequestStatus.PENDING,
@@ -350,10 +418,51 @@ export class RegistrationRequestsService {
       },
       include: {
         student: { include: { user: true } },
-        group: true,
+        group: {
+          select: {
+            id: true,
+            name: true,
+            teacher: { select: { userId: true } },
+          },
+        },
         parent: { include: { user: true } },
       },
     });
+
+    const studentName = `${updated.student.user.firstName} ${updated.student.user.lastName}`;
+    if (updated.group?.teacher?.userId) {
+      await this.notifications.createNotification({
+        userId: updated.group.teacher.userId,
+        type: NotificationType.REGISTRATION_REQUEST,
+        title: "Réponse à la demande d'inscription",
+        message: `L'élève ${studentName} a répondu à votre demande d'informations.`,
+        link: '/registration-requests',
+        resourceType: 'RegistrationRequest',
+        resourceId: updated.id,
+        idempotencyKey: `reg_req:${updated.id}:responded:${previousUpdatedAt}:${updated.group.teacher.userId}`,
+      });
+    } else {
+      const admins = await this.prisma.user.findMany({
+        where: { role: Role.ADMIN },
+        select: { id: true },
+      });
+      await Promise.all(
+        admins.map((admin) =>
+          this.notifications.createNotification({
+            userId: admin.id,
+            type: NotificationType.REGISTRATION_REQUEST,
+            title: "Réponse à la demande d'inscription",
+            message: `L'élève ${studentName} a répondu à votre demande d'informations.`,
+            link: '/registration-requests',
+            resourceType: 'RegistrationRequest',
+            resourceId: updated.id,
+            idempotencyKey: `reg_req:${updated.id}:responded:${previousUpdatedAt}:${admin.id}`,
+          }),
+        ),
+      );
+    }
+
+    return updated;
   }
 
   async cancel(user: { id: string; role: Role }, id: string) {
@@ -391,7 +500,7 @@ export class RegistrationRequestsService {
       throw new ConflictException('Cette demande a déjà été traitée ou clôturée');
     }
 
-    return this.prisma.registrationRequest.update({
+    const updated = await this.prisma.registrationRequest.update({
       where: { id },
       data: {
         status: RegistrationRequestStatus.REJECTED,
@@ -406,10 +515,31 @@ export class RegistrationRequestsService {
         processedBy: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
     });
+
+    const targetUserIds = new Set<string>();
+    if (updated.student?.user?.id) targetUserIds.add(updated.student.user.id);
+    if (updated.parent?.user?.id) targetUserIds.add(updated.parent.user.id);
+
+    await Promise.all(
+      Array.from(targetUserIds).map((userId) =>
+        this.notifications.createNotification({
+          userId,
+          type: NotificationType.REGISTRATION_REQUEST,
+          title: "Demande d'inscription non retenue",
+          message: `Votre demande d'inscription n'a pas pu être acceptée : ${dto.reason}`,
+          link: '/my-registration-requests',
+          resourceType: 'RegistrationRequest',
+          resourceId: updated.id,
+          idempotencyKey: `reg_req:${updated.id}:rejected:${userId}`,
+        }),
+      ),
+    );
+
+    return updated;
   }
 
   async accept(user: { id: string; role: Role }, id: string, dto: AcceptRegistrationRequestDto) {
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       const req = await tx.registrationRequest.findUnique({
         where: { id },
         include: { group: true },
@@ -506,5 +636,26 @@ export class RegistrationRequestsService {
         },
       });
     });
+
+    const targetUserIds = new Set<string>();
+    if (updated.student?.user?.id) targetUserIds.add(updated.student.user.id);
+    if (updated.parent?.user?.id) targetUserIds.add(updated.parent.user.id);
+
+    await Promise.all(
+      Array.from(targetUserIds).map((userId) =>
+        this.notifications.createNotification({
+          userId,
+          type: NotificationType.REGISTRATION_REQUEST,
+          title: "Demande d'inscription acceptée",
+          message: `Votre demande d'inscription pour le groupe ${updated.group?.name ?? ''} a été acceptée !`,
+          link: '/my-groups',
+          resourceType: 'RegistrationRequest',
+          resourceId: updated.id,
+          idempotencyKey: `reg_req:${updated.id}:accepted:${userId}`,
+        }),
+      ),
+    );
+
+    return updated;
   }
 }

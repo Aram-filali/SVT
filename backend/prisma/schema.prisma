@@ -86,6 +86,15 @@ enum EvaluationStatus {
   ARCHIVED
 }
 
+enum NotificationType {
+  REGISTRATION_REQUEST
+  EVALUATION
+  EVALUATION_RESULT
+  RESOURCE
+  CLASS_SESSION
+  SYSTEM
+}
+
 model User {
   id                 String                @id @default(uuid())
   email              String                @unique
@@ -107,6 +116,7 @@ model User {
   markedAttendances  Attendance[]          @relation("AttendanceMarkedBy")
   createdEvaluations Evaluation[]          @relation("EvaluationCreatedBy")
   gradedResults      EvaluationResult[]    @relation("EvaluationGradedBy")
+  notifications      Notification[]        @relation("UserNotifications")
 
   @@map("users")
 }
@@ -372,4 +382,27 @@ model EvaluationResult {
   @@index([studentId])
   @@index([gradedById])
   @@map("evaluation_results")
+}
+
+model Notification {
+  id             String           @id @default(uuid())
+  userId         String
+  type           NotificationType
+  title          String
+  message        String
+  link           String?
+  isRead         Boolean          @default(false)
+  readAt         DateTime?
+  resourceType   String?
+  resourceId     String?
+  idempotencyKey String?          @unique
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  user           User             @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@index([resourceType, resourceId])
+  @@map("notifications")
 }

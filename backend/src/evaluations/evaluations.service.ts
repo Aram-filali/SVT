@@ -18,8 +18,10 @@ import {
 import {
   EvaluationStatus,
   GroupStatus,
+  NotificationType,
   Prisma,
 } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 @Injectable()
 export class EvaluationsService {
@@ -27,6 +29,7 @@ export class EvaluationsService {
     private readonly prisma: PrismaService,
     private readonly ownership: ResourceOwnershipService,
     private readonly configService: ConfigService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ─── HELPER: FORMAT EVALUATION ───────────────────────────────────────────
@@ -365,6 +368,50 @@ export class EvaluationsService {
       },
     });
 
+    // Notify eligible students
+    const eligibleStudents = await this.getEligibleStudents(evaluation.groupId, evaluation.date);
+    const isParentVisible = this.configService.get<string>('PARENT_GRADES_VISIBLE') === 'true';
+
+    for (const student of eligibleStudents) {
+      if (student.user?.id) {
+        await this.notifications.createNotification({
+          userId: student.user.id,
+          type: NotificationType.EVALUATION,
+          title: 'Nouvelle évaluation publiée',
+          message: `L'évaluation "${updated.title}" a été publiée pour votre groupe ${updated.group.name}.`,
+          link: '/my-evaluations',
+          resourceType: 'Evaluation',
+          resourceId: updated.id,
+          idempotencyKey: `eval:${updated.id}:published:${student.user.id}`,
+        });
+      }
+    }
+
+    if (isParentVisible) {
+      const studentIds = eligibleStudents.map((s) => s.id);
+      const parentLinks = await this.prisma.parentStudent.findMany({
+        where: { studentId: { in: studentIds } },
+        include: {
+          parent: { include: { user: true } },
+        },
+      });
+
+      for (const link of parentLinks) {
+        if (link.parent?.user?.id) {
+          await this.notifications.createNotification({
+            userId: link.parent.user.id,
+            type: NotificationType.EVALUATION,
+            title: 'Nouvelle évaluation publiée',
+            message: `Une nouvelle évaluation "${updated.title}" a été publiée pour le groupe ${updated.group.name}.`,
+            link: `/my-children/${link.studentId}/evaluations`,
+            resourceType: 'Evaluation',
+            resourceId: updated.id,
+            idempotencyKey: `eval:${updated.id}:published:${link.parent.user.id}`,
+          });
+        }
+      }
+    }
+
     return this.formatEvaluation(updated);
   }
 
@@ -604,6 +651,50 @@ export class EvaluationsService {
         }),
       ),
     );
+
+    // Send notifications to graded students (and parents if visible)
+    const isParentVisible = this.configService.get<string>('PARENT_GRADES_VISIBLE') === 'true';
+    const eligibleMap = new Map(eligibleStudents.map((s) => [s.id, s]));
+
+    for (const item of dto.results) {
+      const student = eligibleMap.get(item.studentId);
+      if (student?.user?.id) {
+        await this.notifications.createNotification({
+          userId: student.user.id,
+          type: NotificationType.EVALUATION_RESULT,
+          title: 'Note disponible',
+          message: `Votre note pour l'évaluation "${evaluation.title}" est disponible : ${item.score}/${evaluation.maxScore}.`,
+          link: '/my-evaluations',
+          resourceType: 'Evaluation',
+          resourceId: evaluation.id,
+          idempotencyKey: `eval_res:${evaluation.id}:${item.studentId}:graded:${student.user.id}`,
+        });
+      }
+
+      if (isParentVisible) {
+        const parentLinks = await this.prisma.parentStudent.findMany({
+          where: { studentId: item.studentId },
+          include: {
+            parent: { include: { user: true } },
+          },
+        });
+
+        for (const link of parentLinks) {
+          if (link.parent?.user?.id) {
+            await this.notifications.createNotification({
+              userId: link.parent.user.id,
+              type: NotificationType.EVALUATION_RESULT,
+              title: 'Note disponible',
+              message: `La note de votre enfant pour l'évaluation "${evaluation.title}" est disponible : ${item.score}/${evaluation.maxScore}.`,
+              link: `/my-children/${item.studentId}/evaluations`,
+              resourceType: 'Evaluation',
+              resourceId: evaluation.id,
+              idempotencyKey: `eval_res:${evaluation.id}:${item.studentId}:graded:${link.parent.user.id}`,
+            });
+          }
+        }
+      }
+    }
 
     return this.getResults(user, evaluationId);
   }

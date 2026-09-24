@@ -1,4 +1,4 @@
-﻿import { Test, TestingModule } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module.js';
@@ -53,6 +53,12 @@ describe('Phase 2 — Groups, Enrollments, Sessions (e2e)', () => {
     prisma = app.get<PrismaService>(PrismaService);
 
     // Clean any previous test data
+    await prisma.notification.deleteMany({});
+    await prisma.evaluationResult.deleteMany({});
+    await prisma.evaluation.deleteMany({});
+    await prisma.attendance.deleteMany({});
+    await prisma.resource.deleteMany({});
+    await prisma.registrationRequest.deleteMany({});
     await prisma.classSession.deleteMany({});
     await prisma.enrollment.deleteMany({});
     await prisma.group.deleteMany({});

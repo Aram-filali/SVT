@@ -11,7 +11,8 @@ import { ResourceOwnershipService } from '../common/services/resource-ownership.
 import { Role } from '../common/enums/role.enum.js';
 import { CreateResourceDto } from './dto/create-resource.dto.js';
 import { UpdateResourceDto } from './dto/update-resource.dto.js';
-import { ResourceType, ResourceStatus, GroupStatus, ClassSessionStatus, EnrollmentStatus, Prisma } from '@prisma/client';
+import { ResourceType, ResourceStatus, GroupStatus, ClassSessionStatus, EnrollmentStatus, NotificationType, Prisma } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 @Injectable()
 export class ResourcesService {
@@ -19,6 +20,7 @@ export class ResourcesService {
     private prisma: PrismaService,
     private storage: StorageService,
     private ownership: ResourceOwnershipService,
+    private notifications: NotificationsService,
   ) {}
 
   // ─── CREATE ───────────────────────────────────────────────────────────────
@@ -75,7 +77,7 @@ export class ResourcesService {
     }
 
     // 7. Persist
-    return this.prisma.resource.create({
+    const created = await this.prisma.resource.create({
       data: {
         title: dto.title,
         description: dto.description,
@@ -91,6 +93,34 @@ export class ResourcesService {
       },
       include: { uploadedBy: { select: { id: true, firstName: true, lastName: true } } },
     });
+
+    // 8. Notify actively enrolled students in group
+    const activeEnrollments = await this.prisma.enrollment.findMany({
+      where: {
+        groupId,
+        status: EnrollmentStatus.ACTIVE,
+      },
+      include: {
+        student: { include: { user: true } },
+      },
+    });
+
+    for (const enrollment of activeEnrollments) {
+      if (enrollment.student?.user?.id) {
+        await this.notifications.createNotification({
+          userId: enrollment.student.user.id,
+          type: NotificationType.RESOURCE,
+          title: 'Nouvelle ressource disponible',
+          message: `Une nouvelle ressource "${created.title}" a été ajoutée pour votre groupe.`,
+          link: '/my-groups',
+          resourceType: 'Resource',
+          resourceId: created.id,
+          idempotencyKey: `res:${created.id}:created:${enrollment.student.user.id}`,
+        });
+      }
+    }
+
+    return created;
   }
 
   // ─── LIST ─────────────────────────────────────────────────────────────────

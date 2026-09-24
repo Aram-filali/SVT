@@ -4,9 +4,10 @@ import { ResourcesService } from './resources.service.js';
 import { StorageModule } from '../storage/storage.module.js';
 import { CommonModule } from '../common/common.module.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
-  imports: [PrismaModule, CommonModule, StorageModule],
+  imports: [PrismaModule, CommonModule, StorageModule, NotificationsModule],
   controllers: [ResourcesController],
   providers: [ResourcesService],
 })

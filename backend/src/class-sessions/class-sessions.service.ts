@@ -1,4 +1,4 @@
-﻿import {
+import {
   Injectable,
   NotFoundException,
   ConflictException,
@@ -17,13 +17,16 @@ import {
   GroupStatus,
   SessionMode,
   EnrollmentStatus,
+  NotificationType,
 } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 @Injectable()
 export class ClassSessionsService {
   constructor(
     private prisma: PrismaService,
     private ownership: ResourceOwnershipService,
+    private notifications: NotificationsService,
   ) {}
 
   private async getTeacherGroupIds(teacherId: string): Promise<string[]> {
@@ -58,6 +61,64 @@ export class ClassSessionsService {
     }
   }
 
+  private async notifySessionParticipants(
+    groupId: string,
+    notificationData: {
+      type: NotificationType;
+      title: string;
+      message: string;
+      sessionId: string;
+      actionKey: string;
+    },
+  ) {
+    const activeEnrollments = await this.prisma.enrollment.findMany({
+      where: {
+        groupId,
+        status: EnrollmentStatus.ACTIVE,
+      },
+      include: {
+        student: {
+          include: {
+            user: true,
+            parents: {
+              include: { parent: { include: { user: true } } },
+            },
+          },
+        },
+      },
+    });
+
+    for (const enrollment of activeEnrollments) {
+      if (enrollment.student?.user?.id) {
+        await this.notifications.createNotification({
+          userId: enrollment.student.user.id,
+          type: notificationData.type,
+          title: notificationData.title,
+          message: notificationData.message,
+          link: '/my-sessions',
+          resourceType: 'ClassSession',
+          resourceId: notificationData.sessionId,
+          idempotencyKey: `session:${notificationData.sessionId}:${notificationData.actionKey}:${enrollment.student.user.id}`,
+        });
+      }
+
+      for (const parentLink of enrollment.student.parents) {
+        if (parentLink.parent?.user?.id) {
+          await this.notifications.createNotification({
+            userId: parentLink.parent.user.id,
+            type: notificationData.type,
+            title: notificationData.title,
+            message: notificationData.message,
+            link: '/my-sessions',
+            resourceType: 'ClassSession',
+            resourceId: notificationData.sessionId,
+            idempotencyKey: `session:${notificationData.sessionId}:${notificationData.actionKey}:${parentLink.parent.user.id}`,
+          });
+        }
+      }
+    }
+  }
+
   async create(
     user: { id: string; role: Role },
     groupId: string,
@@ -84,7 +145,7 @@ export class ClassSessionsService {
     // Teacher conflict check
     await this.checkConflict(group.teacherId, startAt, endAt);
 
-    return this.prisma.classSession.create({
+    const session = await this.prisma.classSession.create({
       data: {
         groupId,
         startAt,
@@ -99,6 +160,22 @@ export class ClassSessionsService {
         group: { select: { id: true, name: true, level: true } },
       },
     });
+
+    const dateFormatted = startAt.toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    await this.notifySessionParticipants(groupId, {
+      type: NotificationType.CLASS_SESSION,
+      title: 'Nouveau cours planifié',
+      message: `Un cours de SVT a été planifié le ${dateFormatted} pour le groupe ${session.group.name}.`,
+      sessionId: session.id,
+      actionKey: 'created',
+    });
+
+    return session;
   }
 
   async findByGroup(user: { id: string; role: Role }, groupId: string) {
@@ -238,7 +315,7 @@ export class ClassSessionsService {
       await this.checkConflict(session.group.teacherId, startAt, endAt, id);
     }
 
-    return this.prisma.classSession.update({
+    const updated = await this.prisma.classSession.update({
       where: { id },
       data: {
         startAt,
@@ -252,6 +329,22 @@ export class ClassSessionsService {
         group: { select: { id: true, name: true, level: true } },
       },
     });
+
+    const dateFormatted = startAt.toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    await this.notifySessionParticipants(session.groupId, {
+      type: NotificationType.CLASS_SESSION,
+      title: 'Cours de SVT modifié',
+      message: `Le planning du cours de SVT du ${dateFormatted} (${updated.group.name}) a été mis à jour.`,
+      sessionId: updated.id,
+      actionKey: `updated:${updated.updatedAt.getTime()}`,
+    });
+
+    return updated;
   }
 
   async switchOnline(
@@ -273,7 +366,7 @@ export class ClassSessionsService {
       throw new ConflictException('Cannot modify session of an archived group');
     }
 
-    return this.prisma.classSession.update({
+    const updated = await this.prisma.classSession.update({
       where: { id },
       data: {
         mode: SessionMode.ONLINE,
@@ -283,6 +376,22 @@ export class ClassSessionsService {
         group: { select: { id: true, name: true, level: true } },
       },
     });
+
+    const dateFormatted = session.startAt.toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    await this.notifySessionParticipants(session.groupId, {
+      type: NotificationType.CLASS_SESSION,
+      title: 'Cours basculé en ligne',
+      message: `Le cours de SVT du ${dateFormatted} (${updated.group.name}) aura lieu en visio. Lien disponible.`,
+      sessionId: updated.id,
+      actionKey: `online:${updated.updatedAt.getTime()}`,
+    });
+
+    return updated;
   }
 
   async cancel(user: { id: string; role: Role }, id: string) {
@@ -297,7 +406,7 @@ export class ClassSessionsService {
     await this.ownership.assertTeacherOwnsGroup(user, session.groupId);
     // Note: Clôture is allowed even on archived group
 
-    return this.prisma.classSession.update({
+    const updated = await this.prisma.classSession.update({
       where: { id },
       data: {
         status: ClassSessionStatus.CANCELLED,
@@ -306,6 +415,22 @@ export class ClassSessionsService {
         group: { select: { id: true, name: true, level: true } },
       },
     });
+
+    const dateFormatted = session.startAt.toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    await this.notifySessionParticipants(session.groupId, {
+      type: NotificationType.CLASS_SESSION,
+      title: 'Cours de SVT annulé',
+      message: `Le cours de SVT du ${dateFormatted} (${updated.group.name}) a été annulé.`,
+      sessionId: updated.id,
+      actionKey: 'cancelled',
+    });
+
+    return updated;
   }
 
   async complete(user: { id: string; role: Role }, id: string) {
