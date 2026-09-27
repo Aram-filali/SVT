@@ -25,11 +25,17 @@ describe('Auth (e2e)', () => {
     await app.init();
     
     prisma = app.get<PrismaService>(PrismaService);
+
+    await prisma.notification.deleteMany({});
+    await prisma.user.deleteMany({
+      where: { email: { startsWith: 'test' } },
+    });
   });
 
   afterAll(async () => {
+    await prisma.notification.deleteMany({});
     await prisma.user.deleteMany({
-      where: { email: { startsWith: 'test' } }
+      where: { email: { startsWith: 'test' } },
     });
     await app.close();
   });

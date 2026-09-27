@@ -68,6 +68,7 @@ describe('Phase 5 — Progression & Visibility (e2e)', () => {
     configService = app.get<ConfigService>(ConfigService);
 
     // Clean test data
+    await prisma.notification.deleteMany({});
     await prisma.evaluationResult.deleteMany({});
     await prisma.evaluation.deleteMany({});
     await prisma.attendance.deleteMany({});
@@ -217,10 +218,12 @@ describe('Phase 5 — Progression & Visibility (e2e)', () => {
   });
 
   afterAll(async () => {
+    await prisma.notification.deleteMany({});
     await prisma.evaluationResult.deleteMany({});
     await prisma.evaluation.deleteMany({});
     await prisma.attendance.deleteMany({});
     await prisma.resource.deleteMany({});
+    await prisma.registrationRequest.deleteMany({});
     await prisma.classSession.deleteMany({});
     await prisma.enrollment.deleteMany({});
     await prisma.parentStudent.deleteMany({});

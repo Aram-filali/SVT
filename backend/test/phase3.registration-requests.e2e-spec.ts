@@ -233,6 +233,11 @@ describe('Phase 3 — Registration Requests & Admin Activation (e2e)', () => {
   });
 
   afterAll(async () => {
+    await prisma.notification.deleteMany({});
+    await prisma.evaluationResult.deleteMany({});
+    await prisma.evaluation.deleteMany({});
+    await prisma.attendance.deleteMany({});
+    await prisma.resource.deleteMany({});
     await prisma.registrationRequest.deleteMany({});
     await prisma.classSession.deleteMany({});
     await prisma.enrollment.deleteMany({});

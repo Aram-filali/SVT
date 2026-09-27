@@ -169,10 +169,16 @@ describe('Phase 2 — Groups, Enrollments, Sessions (e2e)', () => {
   });
 
   afterAll(async () => {
+    await prisma.notification.deleteMany({});
+    await prisma.evaluationResult.deleteMany({});
+    await prisma.evaluation.deleteMany({});
+    await prisma.attendance.deleteMany({});
+    await prisma.resource.deleteMany({});
+    await prisma.registrationRequest.deleteMany({});
     await prisma.classSession.deleteMany({});
     await prisma.enrollment.deleteMany({});
-    await prisma.group.deleteMany({});
     await prisma.parentStudent.deleteMany({});
+    await prisma.group.deleteMany({});
     await prisma.user.deleteMany({
       where: { email: { startsWith: 'p2-' } },
     });

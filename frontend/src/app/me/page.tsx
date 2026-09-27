@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiFetch, setAccessToken } from '@/lib/api';
 import { useMounted } from '@/lib/useMounted';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface User {
   id: string;
@@ -26,7 +27,7 @@ export default function Me() {
       try {
         const data = await apiFetch<User>('/auth/me');
         setUser(data);
-      } catch (err) {
+      } catch {
         router.push('/login');
       } finally {
         setLoading(false);
@@ -52,7 +53,11 @@ export default function Me() {
   return (
     <div className="flex items-center justify-center min-h-screen p-4 bg-gray-50">
       <div className="p-8 bg-white shadow-lg rounded-xl w-full max-w-md border border-gray-100">
-        <h1 className="text-2xl font-bold mb-6 text-center text-gray-900">Mon Profil & Espace</h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Mon Profil & Espace</h1>
+          <NotificationBell />
+        </div>
+
         <div className="space-y-4 mb-6 bg-gray-50 p-4 rounded-lg">
           <div><span className="font-semibold text-gray-700">Nom :</span> {user.firstName} {user.lastName}</div>
           <div><span className="font-semibold text-gray-700">Email :</span> {user.email}</div>
@@ -63,6 +68,17 @@ export default function Me() {
               {user.status}
             </span>
           </div>
+        </div>
+
+        {/* Notifications Button */}
+        <div className="mb-6">
+          <Link
+            href="/notifications"
+            className="flex items-center justify-center gap-2 w-full bg-slate-800 text-white p-2.5 rounded-lg font-medium hover:bg-slate-900 transition shadow-sm"
+          >
+            <span>🔔</span>
+            <span>Mes Notifications</span>
+          </Link>
         </div>
 
         {/* Shortcuts depending on role */}
